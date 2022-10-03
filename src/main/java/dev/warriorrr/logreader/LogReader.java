@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -66,6 +67,7 @@ public class LogReader {
 
         try (Stream<Path> files = Files.list(logsPath)) {
             files.filter(file -> file.getFileName().toString().endsWith(".log"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
                     .forEach(logFile -> {
                         AtomicBoolean fileNamePrinted = new AtomicBoolean(false);
 
