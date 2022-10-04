@@ -15,6 +15,13 @@ public class FilterCommand extends Command {
 
     @Override
     public void dispatch(String[] args) {
+        boolean exclude = false;
+
+        if (args.length > 0 && "exclude".equalsIgnoreCase(args[0])) {
+            exclude = true;
+            args = Arrays.copyOfRange(args, 1, args.length);
+        }
+
         switch (args.length > 0 ? args[0].toLowerCase(Locale.ROOT) : "") {
             case "phrase" -> {
                 if (args.length < 2 || args[1].isEmpty()) {
@@ -24,14 +31,18 @@ public class FilterCommand extends Command {
 
                 final String phrase = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).toLowerCase(Locale.ROOT);
 
-                reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase));
+                if (exclude)
+                    reader.applyFilter("lines NOT containing '" + phrase + "'", line -> !line.toLowerCase(Locale.ROOT).contains(phrase), true);
+                else
+                    reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase));
+
                 System.out.println("Successfully added filter. Use 'print' to print.");
                 reader.printFilters();
             }
 
-            case "regex" -> {
+            case "expression" -> {
                 if (args.length < 2 || args[1].isEmpty()) {
-                    System.out.println("No regex provided.");
+                    System.out.println("No expression provided.");
                     return;
                 }
 
@@ -39,7 +50,11 @@ public class FilterCommand extends Command {
 
                 try {
                     Pattern regex = Pattern.compile(regexString);
-                    reader.applyFilter("patterns matching the regex '" + regexString + "'", line -> regex.matcher(line).find());
+
+                    if (exclude)
+                        reader.applyFilter("patterns NOT matching the regex '" + regexString + "'", line -> !regex.matcher(line).find(), true);
+                    else
+                        reader.applyFilter("patterns matching the regex '" + regexString + "'", line -> regex.matcher(line).find());
                 } catch (PatternSyntaxException e) {
                     System.out.println("Invalid regex format: " + regexString);
                     e.printStackTrace();

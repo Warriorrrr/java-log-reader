@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -65,6 +67,10 @@ public class LogReader {
             } catch (IOException ignored) {}
         }
 
+        final List<Predicate<String>> allMatchPredicates = appliedFilters.stream().filter(filter -> filter.allMatch).map(filter -> filter.predicate).toList();
+        final List<Predicate<String>> anyMatchPredicates = appliedFilters.stream().filter(filter -> !filter.allMatch).map(filter -> filter.predicate).toList();
+        final AtomicLong printed = new AtomicLong();
+
         try (Stream<Path> files = Files.list(logsPath)) {
             files.filter(file -> file.getFileName().toString().endsWith(".log"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
@@ -73,11 +79,12 @@ public class LogReader {
 
                         try (Stream<String> lines = Files.lines(logFile)) {
                             lines.forEach(line -> {
-                                if (appliedFilters.isEmpty() || appliedFilters.stream().allMatch(filter -> filter.predicate.test(line))) {
+                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) && (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
                                     if (!fileNamePrinted.getAndSet(true))
                                         lineConsumer.accept("-- File: " + logFile + " --");
 
                                     lineConsumer.accept(line);
+                                    printed.incrementAndGet();
                                 }
                             });
                         } catch (IOException e) {
@@ -87,6 +94,13 @@ public class LogReader {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        if (printed.get() == 0L)
+            System.out.println("Done. No lines matched your filter(s)");
+        else {
+            System.out.printf("Done. Printed %d lines.", printed.get());
+            System.out.println();
+        }
     }
 
     public Path logsPath() {
@@ -94,7 +108,11 @@ public class LogReader {
     }
 
     public void applyFilter(String description, Predicate<String> predicate) {
-        this.appliedFilters.add(new Filter(description, predicate));
+        this.appliedFilters.add(new Filter(description, predicate, false));
+    }
+
+    public void applyFilter(String description, Predicate<String> predicate, boolean allMatch) {
+        this.appliedFilters.add(new Filter(description, predicate, allMatch));
     }
 
     public List<Filter> appliedFilters() {
@@ -107,7 +125,10 @@ public class LogReader {
         for (Filter filter : this.appliedFilters) {
             System.out.println("- " + filter.description);
         }
+
+        if (this.appliedFilters.isEmpty())
+            System.out.println("- none");
     }
 
-    public record Filter(String description, Predicate<String> predicate) {}
+    public record Filter(String description, Predicate<String> predicate, boolean allMatch) {}
 }

@@ -40,6 +40,8 @@ public class Main {
         final Scanner scanner = new Scanner(System.in);
         try {
             while (true) {
+                System.out.print("> ");
+
                 String line = scanner.nextLine();
                 if (line.isEmpty())
                     continue;
@@ -48,6 +50,7 @@ public class Main {
                     break;
 
                 reader.receiveCommand(line);
+                System.out.println();
             }
         } catch (Exception ignored) {}
     }
