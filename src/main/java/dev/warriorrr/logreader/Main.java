@@ -31,7 +31,7 @@ public class Main {
 
         clearScreen();
         System.out.println("|##########################################################|");
-        System.out.println("|                     LogReader v1.0.0                     |");
+        System.out.println("|                     LogReader v0.0.2                     |");
         System.out.println("|##########################################################|");
         System.out.println();
         System.out.println("Type 'help' for help.");
