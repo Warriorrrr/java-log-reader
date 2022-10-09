@@ -78,7 +78,7 @@ public class LogReader {
 
                         try (Stream<String> lines = Files.lines(logFile)) {
                             lines.forEach(line -> {
-                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) || (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
+                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) && (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
                                     if (!fileNamePrinted.getAndSet(true))
                                         lineConsumer.accept("-- File: " + logFile + " --");
 

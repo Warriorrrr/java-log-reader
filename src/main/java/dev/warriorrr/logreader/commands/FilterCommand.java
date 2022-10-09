@@ -34,7 +34,7 @@ public class FilterCommand extends Command {
                 if (exclude)
                     reader.applyFilter("lines NOT containing '" + phrase + "'", line -> !line.toLowerCase(Locale.ROOT).contains(phrase), true);
                 else
-                    reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase));
+                    reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase), true);
 
                 System.out.println("Successfully added filter. Use 'print' to print results.");
                 reader.printFilters();
