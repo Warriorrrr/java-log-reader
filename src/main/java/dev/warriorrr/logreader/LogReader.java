@@ -59,7 +59,7 @@ public class LogReader {
         }
     }
 
-    public void read(Consumer<String> lineConsumer) {
+    public long read(Consumer<String> lineConsumer) {
         if (!Files.exists(logsPath)) {
             try {
                 Files.createFile(logsPath);
@@ -78,7 +78,7 @@ public class LogReader {
 
                         try (Stream<String> lines = Files.lines(logFile)) {
                             lines.forEach(line -> {
-                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) && (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
+                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) || (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
                                     if (!fileNamePrinted.getAndSet(true))
                                         lineConsumer.accept("-- File: " + logFile + " --");
 
@@ -100,6 +100,8 @@ public class LogReader {
             System.out.printf("Done. Printed %d lines.", printed.get());
             System.out.println();
         }
+
+        return printed.get();
     }
 
     public Path logsPath() {

@@ -36,11 +36,11 @@ public class FilterCommand extends Command {
                 else
                     reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase));
 
-                System.out.println("Successfully added filter. Use 'print' to print.");
+                System.out.println("Successfully added filter. Use 'print' to print results.");
                 reader.printFilters();
             }
 
-            case "expression" -> {
+            case "expression", "regex" -> {
                 if (args.length < 2 || args[1].isEmpty()) {
                     System.out.println("No expression provided.");
                     return;
@@ -54,13 +54,14 @@ public class FilterCommand extends Command {
                     if (exclude)
                         reader.applyFilter("patterns NOT matching the regex '" + regexString + "'", line -> !regex.matcher(line).find(), true);
                     else
-                        reader.applyFilter("patterns matching the regex '" + regexString + "'", line -> regex.matcher(line).find());
+                        reader.applyFilter("lines matching the regex '" + regexString + "'", line -> regex.matcher(line).find(), true);
                 } catch (PatternSyntaxException e) {
                     System.out.println("Invalid regex format: " + regexString);
-                    e.printStackTrace();
+                    System.out.println(e.getMessage());
+                    return;
                 }
 
-                System.out.println("Successfully added filter. Use 'print' to print.");
+                System.out.println("Successfully added filter. Use 'print' to print results.");
                 reader.printFilters();
             }
 

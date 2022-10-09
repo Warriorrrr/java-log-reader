@@ -8,6 +8,8 @@ import joptsimple.util.PathProperties;
 
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 public class Main {
@@ -52,12 +54,14 @@ public class Main {
                 reader.receiveCommand(line);
                 System.out.println();
             }
-        } catch (Exception ignored) {}
+        } catch (NoSuchElementException | IllegalStateException ignored) {
+            // Scanner closed, ignore
+        }
     }
 
     private static void clearScreen() {
         try {
-            if (System.getProperty("os.name").startsWith("Windows"))
+            if (System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"))
                 new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
             else
                 new ProcessBuilder("clear").inheritIO().start().waitFor();
