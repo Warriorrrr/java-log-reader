@@ -3,6 +3,7 @@ package dev.warriorrr.logreader.commands;
 import dev.warriorrr.logreader.LogReader;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -67,5 +68,15 @@ public class FilterCommand extends Command {
 
             default -> reader.printFilters();
         }
+    }
+
+    @Override
+    public List<String> completions(List<String> args) {
+        if (args.size() == 1)
+            return Arrays.asList("exclude", "phrase", "expression");
+        else if (args.size() == 2 && "exclude".equalsIgnoreCase(args.get(0)))
+            return Arrays.asList("phrase", "expression");
+
+        return super.completions(args);
     }
 }

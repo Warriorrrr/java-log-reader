@@ -131,5 +131,9 @@ public class LogReader {
             System.out.println("- none");
     }
 
+    public Map<String, Command> commands() {
+        return this.commands;
+    }
+
     public record Filter(String description, Predicate<String> predicate, boolean allMatch) {}
 }

@@ -1,5 +1,6 @@
 package dev.warriorrr.logreader;
 
+import dev.warriorrr.logreader.console.LogReaderConsole;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -9,8 +10,6 @@ import joptsimple.util.PathProperties;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
-import java.util.NoSuchElementException;
-import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
@@ -33,30 +32,13 @@ public class Main {
 
         clearScreen();
         System.out.println("|##########################################################|");
-        System.out.println("|                     LogReader v0.0.2                     |");
+        System.out.println("|                     LogReader v0.0.3                     |");
         System.out.println("|##########################################################|");
         System.out.println();
         System.out.println("Type 'help' for help.");
         System.out.println("Logs folder location: " + reader.logsPath().toAbsolutePath());
 
-        final Scanner scanner = new Scanner(System.in);
-        try {
-            while (true) {
-                System.out.print("> ");
-
-                String line = scanner.nextLine();
-                if (line.isEmpty())
-                    continue;
-
-                if ("quit".equalsIgnoreCase(line) || "exit".equalsIgnoreCase(line))
-                    break;
-
-                reader.receiveCommand(line);
-                System.out.println();
-            }
-        } catch (NoSuchElementException | IllegalStateException ignored) {
-            // Scanner closed, ignore
-        }
+        new LogReaderConsole(reader).readCommands();
     }
 
     private static void clearScreen() {

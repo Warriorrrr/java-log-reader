@@ -6,7 +6,7 @@
 
     <groupId>dev.warriorrr</groupId>
     <artifactId>java-log-reader</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
 
     <name>logreader</name>
 
@@ -26,6 +26,16 @@
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
             <version>23.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline</artifactId>
+            <version>3.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal-jansi</artifactId>
+            <version>3.21.0</version>
         </dependency>
     </dependencies>
 
@@ -64,6 +74,7 @@
                 <version>3.3.1-SNAPSHOT</version>
                 <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <minimizeJar>true</minimizeJar>
                 </configuration>
                 <executions>
                     <execution>
