@@ -46,7 +46,7 @@ public class FilterCommand extends Command {
                     return;
                 }
 
-                final String regexString = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).toLowerCase(Locale.ROOT);
+                final String regexString = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
                 try {
                     Pattern regex = Pattern.compile(regexString);
