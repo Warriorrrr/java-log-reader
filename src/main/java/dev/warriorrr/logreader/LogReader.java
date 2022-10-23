@@ -109,7 +109,7 @@ public class LogReader {
     }
 
     public void applyFilter(String description, Predicate<String> predicate) {
-        this.appliedFilters.add(new Filter(description, predicate, false));
+        applyFilter(description, predicate, false);
     }
 
     public void applyFilter(String description, Predicate<String> predicate, boolean allMatch) {

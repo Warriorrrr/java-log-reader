@@ -2,6 +2,8 @@ package dev.warriorrr.logreader.commands;
 
 import dev.warriorrr.logreader.LogReader;
 
+import java.util.List;
+
 public class PrintCommand extends Command {
     public PrintCommand(LogReader reader) {
         super(reader);
@@ -15,5 +17,13 @@ public class PrintCommand extends Command {
         }
 
         reader.read(System.out::println);
+    }
+
+    @Override
+    public List<String> completions(List<String> args) {
+        if (args.size() == 1)
+            return List.of("--matches");
+
+        return super.completions(args);
     }
 }
