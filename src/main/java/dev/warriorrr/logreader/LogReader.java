@@ -150,7 +150,7 @@ public class LogReader {
             files.filter(file -> file.getFileName().toString().endsWith(".gz"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
                     .forEach(file -> {
-                        Path target = targetDir.resolve(file.getFileName().toString().substring(0, file.getFileName().toString().lastIndexOf(".gz")) + ".log");
+                        Path target = targetDir.resolve(file.getFileName().toString().substring(0, file.getFileName().toString().lastIndexOf(".gz")));
                         if (Files.exists(target))
                             return;
 
