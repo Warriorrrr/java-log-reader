@@ -7,12 +7,12 @@ import dev.warriorrr.logreader.commands.PrintCommand;
 import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -145,6 +145,7 @@ public class LogReader {
         System.out.println();
         System.out.println("Looking for compressed logs in " + targetDir.toAbsolutePath() + "...");
 
+        byte[] buffer = new byte[1024];
         try (Stream<Path> files = Files.list(fetchDir)) {
             files.filter(file -> file.getFileName().toString().endsWith(".gz"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
@@ -155,9 +156,14 @@ public class LogReader {
 
                         System.out.println("Decompressing " + file + "...");
 
-                        try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(file))) {
-                            // Since we read all logs as utf-8, make sure to write the input bytes as utf-8 strings
-                            Files.writeString(target, new String(in.readAllBytes(), StandardCharsets.UTF_8), StandardOpenOption.CREATE);
+                        try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(file));
+                            BufferedWriter out = Files.newBufferedWriter(target)) {
+
+                            while (in.read(buffer) > 0) {
+                                // Since we read all logs as utf-8, make sure to write the input bytes as utf-8 strings
+                                out.write(new String(buffer, StandardCharsets.UTF_8));
+                                out.newLine();
+                            }
                         } catch (IOException e) {
                             System.out.println("An exception occurred when decompressing logs");
                             e.printStackTrace();
