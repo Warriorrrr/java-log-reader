@@ -20,6 +20,11 @@ public class Main {
                 .withValuesConvertedBy(new PathConverter(PathProperties.DIRECTORY_EXISTING))
                 .defaultsTo(Path.of("logs"));
 
+        parser.accepts("fetchlogs", "Fetches & decompresses .gz compressed log files.")
+                .withOptionalArg()
+                .describedAs("The directory to fetch compressed logs from. Defaults to logs folder.")
+                .withValuesConvertedBy(new PathConverter(PathProperties.DIRECTORY_EXISTING));
+
         OptionSet options;
         try {
             options = parser.parse(args);
@@ -28,15 +33,20 @@ public class Main {
             return;
         }
 
-        final LogReader reader = new LogReader((Path) options.valueOf("folder"));
+        final LogReader reader = new LogReader((Path) options.valueOf("logsfolder"));
 
         clearScreen();
         System.out.println("|##########################################################|");
-        System.out.println("|                     LogReader v0.0.3                     |");
+        System.out.println("|                     LogReader v0.0.4                     |");
         System.out.println("|##########################################################|");
         System.out.println();
         System.out.println("Type 'help' for help.");
         System.out.println("Logs folder location: " + reader.logsPath().toAbsolutePath());
+
+        // Fetch logs if option is present.
+        // The fetchlogs option has an optional argument, if it's not present we'll use the logs folder
+        if (options.has("fetchlogs"))
+            reader.fetchCompressedLogs((Path) options.valueOfOptional("fetchlogs").orElse(options.valueOf("logsfolder")), (Path) options.valueOf("logsfolder"));
 
         new LogReaderConsole(reader).readCommands();
     }

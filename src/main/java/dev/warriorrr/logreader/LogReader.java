@@ -8,8 +8,11 @@ import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -22,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 
 public class LogReader {
     private final Path logsPath;
@@ -136,4 +140,43 @@ public class LogReader {
     }
 
     public record Filter(String description, Predicate<String> predicate, boolean allMatch) {}
+
+    public void fetchCompressedLogs(Path fetchDir, Path targetDir) {
+        System.out.println();
+        System.out.println("Looking for compressed logs in " + targetDir.toAbsolutePath() + "...");
+
+        try (Stream<Path> files = Files.list(fetchDir)) {
+            files.filter(file -> file.getFileName().toString().endsWith(".gz"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
+                    .forEach(file -> {
+                        Path target = targetDir.resolve(file.getFileName().toString().substring(0, file.getFileName().toString().lastIndexOf(".gz")) + ".log");
+                        if (Files.exists(target))
+                            return;
+
+                        System.out.println("Decompressing " + file + "...");
+
+                        try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(file))) {
+                            // Since we read all logs as utf-8, make sure to write the input bytes as utf-8 strings
+                            Files.writeString(target, new String(in.readAllBytes(), StandardCharsets.UTF_8), StandardOpenOption.CREATE);
+                        } catch (IOException e) {
+                            System.out.println("An exception occurred when decompressing logs");
+                            e.printStackTrace();
+                        }
+                    });
+        } catch (IOException e) {
+            System.out.println("An exception occurred when decompressing logs");
+            e.printStackTrace();
+        }
+
+        System.out.println("Grabbing latest.log...");
+
+        try {
+            Files.copy(fetchDir.resolve("latest.log"), targetDir.resolve("latest.log"), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            System.out.println("An exception occurred when copying latest.log");
+            e.printStackTrace();
+        }
+
+        System.out.println("Finished fetching logs.");
+    }
 }
