@@ -1,11 +1,13 @@
 package dev.warriorrr.logreader;
 
+import dev.warriorrr.logreader.commands.ChangeDirCommand;
 import dev.warriorrr.logreader.commands.Command;
 import dev.warriorrr.logreader.commands.FilterCommand;
 import dev.warriorrr.logreader.commands.HelpCommand;
 import dev.warriorrr.logreader.commands.PrintCommand;
 import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -28,7 +30,7 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 public class LogReader {
-    private final Path logsPath;
+    private Path logsPath;
     private final Map<String, Command> commands = new HashMap<>();
 
     // Instead of storing all lines, store the active filters.
@@ -42,6 +44,8 @@ public class LogReader {
         commands.put("undo", new UndoCommand(this));
         commands.put("save", new SaveCommand(this));
         commands.put("print", new PrintCommand(this));
+        commands.put("changedir", new ChangeDirCommand(this));
+        commands.put("cd", commands.get("changedir"));
     }
 
     public void receiveCommand(String line) {
@@ -110,6 +114,10 @@ public class LogReader {
 
     public Path logsPath() {
         return logsPath;
+    }
+
+    public void logsPath(@NotNull Path path) {
+        this.logsPath = path;
     }
 
     public void applyFilter(String description, Predicate<String> predicate) {
