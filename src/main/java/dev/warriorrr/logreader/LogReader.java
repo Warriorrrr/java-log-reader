@@ -120,10 +120,6 @@ public class LogReader {
         this.logsPath = path;
     }
 
-    public void applyFilter(String description, Predicate<String> predicate) {
-        applyFilter(description, predicate, false);
-    }
-
     public void applyFilter(String description, Predicate<String> predicate, boolean allMatch) {
         this.appliedFilters.add(new Filter(description, predicate, allMatch));
     }
