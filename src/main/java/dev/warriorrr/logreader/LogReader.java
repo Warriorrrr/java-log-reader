@@ -78,13 +78,13 @@ public class LogReader {
         final List<Predicate<String>> anyMatchPredicates = appliedFilters.stream().filter(filter -> !filter.allMatch).map(filter -> filter.predicate).toList();
         final AtomicLong printed = new AtomicLong();
 
-        try (Stream<Path> files = Files.list(logsPath)) {
+        try (final Stream<Path> files = Files.list(logsPath)) {
             files.filter(file -> file.getFileName().toString().endsWith(".log"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
                     .forEach(logFile -> {
-                        AtomicBoolean fileNamePrinted = new AtomicBoolean(false);
+                        final AtomicBoolean fileNamePrinted = new AtomicBoolean(false);
 
-                        try (Stream<String> lines = Files.lines(logFile)) {
+                        try (final Stream<String> lines = Files.lines(logFile)) {
                             lines.forEach(line -> {
                                 if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) && (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
                                     if (!fileNamePrinted.getAndSet(true))
