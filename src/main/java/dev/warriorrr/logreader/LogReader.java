@@ -9,8 +9,10 @@ import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -149,7 +151,6 @@ public class LogReader {
         System.out.println();
         System.out.println("Looking for compressed logs in " + targetDir.toAbsolutePath() + "...");
 
-        byte[] buffer = new byte[1024];
         try (Stream<Path> files = Files.list(fetchDir)) {
             files.filter(file -> file.getFileName().toString().endsWith(".gz"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
@@ -160,16 +161,17 @@ public class LogReader {
 
                         System.out.println("Decompressing " + file + "...");
 
-                        try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(file));
-                            BufferedWriter out = Files.newBufferedWriter(target)) {
+                        try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(file));
+                            BufferedWriter out = Files.newBufferedWriter(target);
+                            BufferedReader in = new BufferedReader(new InputStreamReader(gzipIn, StandardCharsets.UTF_8))) {
 
-                            while (in.read(buffer) > 0) {
-                                // Since we read all logs as utf-8, make sure to write the input bytes as utf-8 strings
-                                out.write(new String(buffer, StandardCharsets.UTF_8));
+                            String string;
+                            while ((string = in.readLine()) != null) {
+                                out.write(string);
                                 out.newLine();
                             }
                         } catch (IOException e) {
-                            System.out.println("An exception occurred when decompressing logs");
+                            System.out.println("An exception occurred when decompressing log file " + file + ".");
                             e.printStackTrace();
                         }
                     });
