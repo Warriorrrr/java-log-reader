@@ -18,7 +18,7 @@ public class SaveCommand extends Command {
 
     @Override
     public void dispatch(String[] args) {
-        String fileName = args.length > 0 ? args[0] : generateFileName();
+        String fileName = args.length > 0 ? String.join("-", args) : generateFileName();
         Path output = outputFolder.resolve(fileName + ".log");
 
         try {
@@ -29,6 +29,8 @@ public class SaveCommand extends Command {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        System.out.println("Saving log to './output/" + fileName + ".log'...");
 
         try (BufferedWriter buf = Files.newBufferedWriter(output, StandardOpenOption.APPEND, StandardOpenOption.CREATE)) {
             reader.read(line -> {
