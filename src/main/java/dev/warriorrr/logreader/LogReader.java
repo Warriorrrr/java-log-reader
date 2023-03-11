@@ -180,13 +180,15 @@ public class LogReader {
             e.printStackTrace();
         }
 
-        System.out.println("Grabbing latest.log...");
+        if (Files.exists(fetchDir.resolve("latest.log"))) {
+            System.out.println("Grabbing latest.log...");
 
-        try {
-            Files.copy(fetchDir.resolve("latest.log"), targetDir.resolve("latest.log"), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            System.out.println("An exception occurred when copying latest.log");
-            e.printStackTrace();
+            try {
+                Files.copy(fetchDir.resolve("latest.log"), targetDir.resolve("latest.log"), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                System.out.println("An exception occurred when copying latest.log");
+                e.printStackTrace();
+            }
         }
 
         System.out.println("Finished fetching logs.");
