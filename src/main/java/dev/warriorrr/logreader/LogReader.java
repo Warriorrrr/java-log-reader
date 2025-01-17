@@ -7,6 +7,7 @@ import dev.warriorrr.logreader.commands.HelpCommand;
 import dev.warriorrr.logreader.commands.PrintCommand;
 import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
+import dev.warriorrr.logreader.filter.Filter;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -71,13 +72,20 @@ public class LogReader {
 
     public long read(Consumer<String> lineConsumer) {
         if (!Files.exists(logsPath)) {
-            try {
-                Files.createFile(logsPath);
-            } catch (IOException ignored) {}
+            System.out.printf("Path %s does not exist.", logsPath.toString());
+            return 0;
         }
 
-        final List<Predicate<String>> allMatchPredicates = appliedFilters.stream().filter(filter -> filter.allMatch).map(filter -> filter.predicate).toList();
-        final List<Predicate<String>> anyMatchPredicates = appliedFilters.stream().filter(filter -> !filter.allMatch).map(filter -> filter.predicate).toList();
+        final Predicate<String> allMatches = appliedFilters.stream()
+                .filter(Filter::requireAllMatch)
+                .map(filter -> (Predicate<String>) filter::matches)
+                .reduce(x -> true, Predicate::and);
+
+        final Predicate<String> anyMatches = appliedFilters.stream()
+                .filter(filter -> !filter.requireAllMatch())
+                .map(filter -> (Predicate<String>) filter::matches)
+                .reduce(x -> false, Predicate::or);
+
         final AtomicLong printed = new AtomicLong();
 
         try (final Stream<Path> files = Files.list(logsPath)) {
@@ -88,7 +96,7 @@ public class LogReader {
 
                         try (final Stream<String> lines = Files.lines(logFile)) {
                             lines.forEach(line -> {
-                                if (allMatchPredicates.stream().allMatch(predicate -> predicate.test(line)) && (anyMatchPredicates.isEmpty() || anyMatchPredicates.stream().anyMatch(predicate -> predicate.test(line)))) {
+                                if (allMatches.test(line) || anyMatches.test(line)) {
                                     if (!fileNamePrinted.getAndSet(true))
                                         lineConsumer.accept("-- File: " + logFile + " --");
 
@@ -123,7 +131,18 @@ public class LogReader {
     }
 
     public void applyFilter(String description, Predicate<String> predicate, boolean allMatch) {
-        this.appliedFilters.add(new Filter(description, predicate, allMatch));
+        // TODO: make proper filter classes
+        this.appliedFilters.add(new Filter(description) {
+            @Override
+            public boolean matches(String line) {
+                return predicate.test(line);
+            }
+
+            @Override
+            public boolean requireAllMatch() {
+                return allMatch;
+            }
+        });
     }
 
     public List<Filter> appliedFilters() {
@@ -134,7 +153,7 @@ public class LogReader {
         System.out.println("Currently applied filters:");
 
         for (Filter filter : this.appliedFilters) {
-            System.out.println("- " + filter.description);
+            System.out.println("- " + filter.description());
         }
 
         if (this.appliedFilters.isEmpty())
@@ -144,8 +163,6 @@ public class LogReader {
     public Map<String, Command> commands() {
         return this.commands;
     }
-
-    public record Filter(String description, Predicate<String> predicate, boolean allMatch) {}
 
     public void fetchCompressedLogs(Path fetchDir, Path targetDir) {
         System.out.println();
