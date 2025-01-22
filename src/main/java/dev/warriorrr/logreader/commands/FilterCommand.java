@@ -1,6 +1,10 @@
 package dev.warriorrr.logreader.commands;
 
 import dev.warriorrr.logreader.LogReader;
+import dev.warriorrr.logreader.filter.ContainsFilter;
+import dev.warriorrr.logreader.filter.Filter;
+import dev.warriorrr.logreader.filter.InverseFilter;
+import dev.warriorrr.logreader.filter.RegexFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -31,11 +35,12 @@ public class FilterCommand extends Command {
                 }
 
                 final String phrase = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).toLowerCase(Locale.ROOT);
+                Filter filter = new ContainsFilter(phrase);
 
                 if (exclude)
-                    reader.applyFilter("lines NOT containing '" + phrase + "'", line -> !line.toLowerCase(Locale.ROOT).contains(phrase), true);
-                else
-                    reader.applyFilter("lines containing '" + phrase + "'", line -> line.toLowerCase(Locale.ROOT).contains(phrase), true);
+                    filter = new InverseFilter(filter);
+
+                reader.applyFilter(filter);
 
                 System.out.println("Successfully added filter. Use 'print' to print results.");
                 reader.printFilters();
@@ -51,11 +56,12 @@ public class FilterCommand extends Command {
 
                 try {
                     Pattern regex = Pattern.compile(regexString);
+                    Filter filter = new RegexFilter(regex);
 
                     if (exclude)
-                        reader.applyFilter("patterns NOT matching the regex '" + regexString + "'", line -> !regex.matcher(line).find(), true);
-                    else
-                        reader.applyFilter("lines matching the regex '" + regexString + "'", line -> regex.matcher(line).find(), true);
+                        filter = new InverseFilter(filter);
+
+                    reader.applyFilter(filter);
                 } catch (PatternSyntaxException e) {
                     System.out.println("Invalid regex format: " + regexString);
                     System.out.println(e.getMessage());

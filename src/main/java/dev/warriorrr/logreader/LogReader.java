@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -74,16 +75,6 @@ public class LogReader {
             return 0;
         }
 
-        final Predicate<String> allMatches = appliedFilters.stream()
-                .filter(Filter::requireAllMatch)
-                .map(filter -> (Predicate<String>) filter::matches)
-                .reduce(x -> true, Predicate::and);
-
-        final Predicate<String> anyMatches = appliedFilters.stream()
-                .filter(filter -> !filter.requireAllMatch())
-                .map(filter -> (Predicate<String>) filter::matches)
-                .reduce(x -> false, Predicate::or);
-
         final AtomicLong printed = new AtomicLong();
 
         try (final Stream<Path> files = Files.list(logsPath)) {
@@ -101,18 +92,26 @@ public class LogReader {
 
                         try (final BufferedReader reader = adapter.adapt(logFile)) {
                             String line;
+                            lineLoop:
                             while ((line = reader.readLine()) != null) {
-                                if (allMatches.test(line) || anyMatches.test(line)) {
-                                    if (!fileNamePrinted) {
-                                        lineConsumer.accept("-- File: " + logFile + " --");
-                                        fileNamePrinted = true;
-                                    }
+                                final String lowercaseLine = line.toLowerCase(Locale.ROOT);
 
-                                    lineConsumer.accept(line);
-                                    printed.incrementAndGet();
+                                // All filters must pass for the line to be valid
+                                for (final Filter filter : this.appliedFilters) {
+                                    if (!filter.matches(line, lowercaseLine))
+                                        continue lineLoop;
                                 }
+
+                                if (!fileNamePrinted) {
+                                    lineConsumer.accept("-- File: " + logFile + " --");
+                                    fileNamePrinted = true;
+                                }
+
+                                lineConsumer.accept(line);
+                                printed.incrementAndGet();
                             }
                         } catch (IOException e) {
+                            System.out.println("An IO exception occurred while reading file " + logFile);
                             e.printStackTrace();
                         }
                     });
@@ -138,19 +137,8 @@ public class LogReader {
         this.logsPath = path;
     }
 
-    public void applyFilter(String description, Predicate<String> predicate, boolean allMatch) {
-        // TODO: make proper filter classes
-        this.appliedFilters.add(new Filter(description) {
-            @Override
-            public boolean matches(String line) {
-                return predicate.test(line);
-            }
-
-            @Override
-            public boolean requireAllMatch() {
-                return allMatch;
-            }
-        });
+    public void applyFilter(Filter filter) {
+        this.appliedFilters.add(filter);
     }
 
     public List<Filter> appliedFilters() {

@@ -13,7 +13,5 @@ public abstract class Filter {
         return this.description;
     }
 
-    public abstract boolean matches(final String line);
-
-    public abstract boolean requireAllMatch();
+    public abstract boolean matches(final String line, final String lineLowercase);
 }
