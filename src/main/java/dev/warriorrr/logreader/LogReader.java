@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -88,7 +87,9 @@ public class LogReader {
         final AtomicLong printed = new AtomicLong();
 
         try (final Stream<Path> files = Files.list(logsPath)) {
-            files.sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
+            files
+                    .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
                     .forEach(logFile -> {
                         final FileAdapter adapter = FileAdapters.adapterFor(logFile);
                         if (adapter == null) {
@@ -96,14 +97,16 @@ public class LogReader {
                             return;
                         }
 
-                        final AtomicBoolean fileNamePrinted = new AtomicBoolean(false);
+                        boolean fileNamePrinted = false;
 
                         try (final BufferedReader reader = adapter.adapt(logFile)) {
                             String line;
                             while ((line = reader.readLine()) != null) {
                                 if (allMatches.test(line) || anyMatches.test(line)) {
-                                    if (!fileNamePrinted.getAndSet(true))
+                                    if (!fileNamePrinted) {
                                         lineConsumer.accept("-- File: " + logFile + " --");
+                                        fileNamePrinted = true;
+                                    }
 
                                     lineConsumer.accept(line);
                                     printed.incrementAndGet();
