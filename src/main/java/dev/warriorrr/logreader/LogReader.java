@@ -7,17 +7,15 @@ import dev.warriorrr.logreader.commands.HelpCommand;
 import dev.warriorrr.logreader.commands.PrintCommand;
 import dev.warriorrr.logreader.commands.SaveCommand;
 import dev.warriorrr.logreader.commands.UndoCommand;
+import dev.warriorrr.logreader.file.FileAdapter;
+import dev.warriorrr.logreader.file.FileAdapters;
 import dev.warriorrr.logreader.filter.Filter;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -30,17 +28,18 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import java.util.zip.GZIPInputStream;
 
 public class LogReader {
+    private final LogReaderOptions options;
     private Path logsPath;
     private final Map<String, Command> commands = new HashMap<>();
 
     // Instead of storing all lines, store the active filters.
     private final List<Filter> appliedFilters = new ArrayList<>();
 
-    public LogReader(Path logsPath) {
-        this.logsPath = logsPath;
+    public LogReader(LogReaderOptions options) {
+        this.options = options;
+        this.logsPath = options.logsFolder;
 
         commands.put("help", new HelpCommand(this));
         commands.put("filter", new FilterCommand(this));
@@ -89,13 +88,19 @@ public class LogReader {
         final AtomicLong printed = new AtomicLong();
 
         try (final Stream<Path> files = Files.list(logsPath)) {
-            files.filter(file -> file.getFileName().toString().endsWith(".log"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
+            files.sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
                     .forEach(logFile -> {
+                        final FileAdapter adapter = FileAdapters.adapterFor(logFile);
+                        if (adapter == null) {
+                            System.out.println("Could not find a compatible adapter for file " + logFile);
+                            return;
+                        }
+
                         final AtomicBoolean fileNamePrinted = new AtomicBoolean(false);
 
-                        try (final Stream<String> lines = Files.lines(logFile)) {
-                            lines.forEach(line -> {
+                        try (final BufferedReader reader = adapter.adapt(logFile)) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
                                 if (allMatches.test(line) || anyMatches.test(line)) {
                                     if (!fileNamePrinted.getAndSet(true))
                                         lineConsumer.accept("-- File: " + logFile + " --");
@@ -103,7 +108,7 @@ public class LogReader {
                                     lineConsumer.accept(line);
                                     printed.incrementAndGet();
                                 }
-                            });
+                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -162,52 +167,5 @@ public class LogReader {
 
     public Map<String, Command> commands() {
         return this.commands;
-    }
-
-    public void fetchCompressedLogs(Path fetchDir, Path targetDir) {
-        System.out.println();
-        System.out.println("Looking for compressed logs in " + targetDir.toAbsolutePath() + "...");
-
-        try (Stream<Path> files = Files.list(fetchDir)) {
-            files.filter(file -> file.getFileName().toString().endsWith(".gz"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
-                    .forEach(file -> {
-                        Path target = targetDir.resolve(file.getFileName().toString().substring(0, file.getFileName().toString().lastIndexOf(".gz")));
-                        if (Files.exists(target))
-                            return;
-
-                        System.out.println("Decompressing " + file + "...");
-
-                        try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(file));
-                            BufferedWriter out = Files.newBufferedWriter(target);
-                            BufferedReader in = new BufferedReader(new InputStreamReader(gzipIn, StandardCharsets.UTF_8))) {
-
-                            String string;
-                            while ((string = in.readLine()) != null) {
-                                out.write(string);
-                                out.newLine();
-                            }
-                        } catch (IOException e) {
-                            System.out.println("An exception occurred when decompressing log file " + file + ".");
-                            e.printStackTrace();
-                        }
-                    });
-        } catch (IOException e) {
-            System.out.println("An exception occurred when decompressing logs");
-            e.printStackTrace();
-        }
-
-        if (Files.exists(fetchDir.resolve("latest.log"))) {
-            System.out.println("Grabbing latest.log...");
-
-            try {
-                Files.copy(fetchDir.resolve("latest.log"), targetDir.resolve("latest.log"), StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                System.out.println("An exception occurred when copying latest.log");
-                e.printStackTrace();
-            }
-        }
-
-        System.out.println("Finished fetching logs.");
     }
 }
