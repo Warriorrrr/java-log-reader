@@ -3,6 +3,8 @@ package dev.warriorrr.logreader;
 import dev.warriorrr.logreader.console.LogReaderConsole;
 import picocli.CommandLine;
 
+import java.util.Optional;
+
 public class Main {
     public static void main(String[] args) {
         final LogReaderOptions options = new LogReaderOptions();
@@ -22,6 +24,6 @@ public class Main {
     }
 
     private static String getVersion() {
-        return Main.class.getPackage().getSpecificationVersion();
+        return Optional.ofNullable(Main.class.getPackage().getSpecificationVersion()).orElse("dev");
     }
 }

@@ -2,6 +2,7 @@ package dev.warriorrr.logreader;
 
 import dev.warriorrr.logreader.commands.ChangeDirCommand;
 import dev.warriorrr.logreader.commands.Command;
+import dev.warriorrr.logreader.commands.DateCommand;
 import dev.warriorrr.logreader.commands.FilterCommand;
 import dev.warriorrr.logreader.commands.HelpCommand;
 import dev.warriorrr.logreader.commands.PrintCommand;
@@ -16,6 +17,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -23,10 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class LogReader {
@@ -36,6 +39,10 @@ public class LogReader {
 
     // Instead of storing all lines, store the active filters.
     private final List<Filter> appliedFilters = new ArrayList<>();
+
+    private LocalDate minDate = null;
+    private LocalDate maxDate = null;
+    private static final Pattern FILE_NAME_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}");
 
     public LogReader(LogReaderOptions options) {
         this.options = options;
@@ -48,6 +55,7 @@ public class LogReader {
         commands.put("print", new PrintCommand(this));
         commands.put("changedir", new ChangeDirCommand(this));
         commands.put("cd", commands.get("changedir"));
+        commands.put("date", new DateCommand(this));
     }
 
     public void receiveCommand(String line) {
@@ -77,46 +85,51 @@ public class LogReader {
 
         final AtomicLong printed = new AtomicLong();
 
-        try (final Stream<Path> files = Files.list(logsPath)) {
-            files
-                    .filter(Files::isRegularFile)
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
-                    .forEach(logFile -> {
-                        final FileAdapter adapter = FileAdapters.adapterFor(logFile);
-                        if (adapter == null) {
-                            System.out.println("Could not find a compatible adapter for file " + logFile);
-                            return;
-                        }
+        final List<Path> candidateFiles = new ArrayList<>();
 
-                        boolean fileNamePrinted = false;
 
-                        try (final BufferedReader reader = adapter.adapt(logFile)) {
-                            String line;
-                            lineLoop:
-                            while ((line = reader.readLine()) != null) {
-                                final String lowercaseLine = line.toLowerCase(Locale.ROOT);
-
-                                // All filters must pass for the line to be valid
-                                for (final Filter filter : this.appliedFilters) {
-                                    if (!filter.matches(line, lowercaseLine))
-                                        continue lineLoop;
-                                }
-
-                                if (!fileNamePrinted) {
-                                    lineConsumer.accept("-- File: " + logFile + " --");
-                                    fileNamePrinted = true;
-                                }
-
-                                lineConsumer.accept(line);
-                                printed.incrementAndGet();
-                            }
-                        } catch (IOException e) {
-                            System.out.println("An IO exception occurred while reading file " + logFile);
-                            e.printStackTrace();
-                        }
-                    });
+        try (Stream<Path> files = Files.list(logsPath)) {
+            files.filter(Files::isRegularFile)
+                .filter(this::checkFileDate)
+                .sorted(Comparator.comparing(path -> path.getFileName().toString(), String::compareTo))
+                .forEach(candidateFiles::add);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        for (final Path logFile : candidateFiles) {
+            final FileAdapter adapter = FileAdapters.adapterFor(logFile);
+            if (adapter == null) {
+                System.out.println("Could not find a compatible adapter for file " + logFile);
+                continue;
+            }
+
+            boolean fileNamePrinted = false;
+
+            try (final BufferedReader reader = adapter.adapt(logFile)) {
+                String line;
+                lineLoop:
+                while ((line = reader.readLine()) != null) {
+                    final String lowercaseLine = line.toLowerCase(Locale.ROOT);
+
+                    // All filters must pass for the line to be valid
+                    for (final Filter filter : this.appliedFilters) {
+                        if (!filter.matches(line, lowercaseLine))
+                            continue lineLoop;
+                    }
+
+                    if (!fileNamePrinted) {
+                        lineConsumer.accept("-- File: " + logFile + " --");
+                        fileNamePrinted = true;
+                    }
+
+                    lineConsumer.accept(line);
+                    printed.incrementAndGet();
+                }
+            } catch (IOException e) {
+                System.out.println("An IO exception occurred while reading file " + logFile);
+                e.printStackTrace();
+            }
         }
 
         if (printed.get() == 0L)
@@ -127,6 +140,43 @@ public class LogReader {
         }
 
         return printed.get();
+    }
+
+    /**
+     * Checks whether the file is valid according to the current min and max date.
+     * @param file The file to check
+     * @return Whether the date for this file is between the min and max date
+     */
+    private boolean checkFileDate(final Path file) {
+        if (minDate == null && maxDate == null) {
+            return true;
+        }
+
+        final String fileName = file.getFileName().toString();
+        LocalDate date;
+
+        if (fileName.equals("latest.log")) {
+            try {
+                date = LocalDate.ofInstant(Files.getLastModifiedTime(file).toInstant(), ZoneId.systemDefault());
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
+        } else {
+            // parse date from file name
+            final Matcher matcher = FILE_NAME_DATE_PATTERN.matcher(fileName);
+            if (!matcher.find()) {
+                return false;
+            }
+
+            date = LocalDate.parse(matcher.group());
+        }
+
+        if (minDate != null && date.isBefore(minDate)) {
+            return false;
+        }
+
+        return maxDate == null || date.isBefore(maxDate);
     }
 
     public Path logsPath() {
@@ -148,15 +198,36 @@ public class LogReader {
     public void printFilters() {
         System.out.println("Currently applied filters:");
 
+        final List<String> out = new ArrayList<>();
         for (Filter filter : this.appliedFilters) {
-            System.out.println("- " + filter.description());
+            out.add("- " + filter.description());
         }
 
-        if (this.appliedFilters.isEmpty())
-            System.out.println("- none");
+        if (this.minDate != null) {
+            out.add("- Logs after " + this.minDate);
+        }
+
+        if (this.maxDate != null) {
+            out.add("- Logs before " + this.maxDate);
+        }
+
+        if (out.isEmpty())
+            out.add("- none");
+
+        for (final String line : out) {
+            System.out.println(line);
+        }
     }
 
     public Map<String, Command> commands() {
         return this.commands;
+    }
+
+    public void setMaxDate(LocalDate maxDate) {
+        this.maxDate = maxDate;
+    }
+
+    public void setMinDate(LocalDate minDate) {
+        this.minDate = minDate;
     }
 }

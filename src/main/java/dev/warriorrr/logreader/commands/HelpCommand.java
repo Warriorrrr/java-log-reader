@@ -14,6 +14,8 @@ public class HelpCommand extends Command {
         System.out.println("- filter exclude phrase <phrase>    | Exclude all lines containing the specified phrase.");
         System.out.println("- filter expression <regex>         | Include all lines matching the specified regex.");
         System.out.println("- filter exclude expression <regex> | Exclude all lines matching the specified regex.");
+        System.out.println("- date min [<date>]                 | Exclude all logs before the given date.");
+        System.out.println("- date max [<date>]                 | Exclude all logs after the given date.");
         System.out.println("- help                              | Show this text.");
         System.out.println("- print                             | Prints all lines matching the filters added using the filter command.");
         System.out.println("- save [filename]                   | Saves all lines matching the filters added using the filter command to an output file.");
