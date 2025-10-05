@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("application")
     id("com.gradleup.shadow") version "9.2.2"
 }
 
@@ -26,7 +27,15 @@ tasks {
     }
 
     shadowJar {
-        archiveClassifier.set("")
+        archiveClassifier.set("all")
+    }
+
+    jar {
+        manifest {
+            attributes(
+                "Specification-Version" to project.version
+            )
+        }
     }
 
     compileJava {
@@ -36,4 +45,8 @@ tasks {
     test {
         useJUnitPlatform()
     }
+}
+
+application {
+    mainClass = "dev.warriorrr.logreader.Main"
 }
