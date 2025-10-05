@@ -26,6 +26,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -43,6 +49,7 @@ public class LogReader {
     private LocalDate minDate = null;
     private LocalDate maxDate = null;
     private static final Pattern FILE_NAME_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}");
+    private static final String EOF_MARKER = "_LOG_READER_END_" + UUID.randomUUID() + "_"; // we need some string to act as a marker for that we reached the end of a queue.
 
     public LogReader(LogReaderOptions options) {
         this.options = options;
@@ -84,9 +91,9 @@ public class LogReader {
         }
 
         final AtomicLong printed = new AtomicLong();
-
         final List<Path> candidateFiles = new ArrayList<>();
 
+        final long start = System.currentTimeMillis();
 
         try (Stream<Path> files = Files.list(logsPath)) {
             files.filter(Files::isRegularFile)
@@ -97,45 +104,82 @@ public class LogReader {
             e.printStackTrace();
         }
 
-        for (final Path logFile : candidateFiles) {
-            final FileAdapter adapter = FileAdapters.adapterFor(logFile);
-            if (adapter == null) {
-                System.out.println("Could not find a compatible adapter for file " + logFile);
-                continue;
-            }
+        final Map<Path, BlockingQueue<String>> queues = new ConcurrentHashMap<>();
+        candidateFiles.forEach(file -> queues.put(file, new LinkedBlockingQueue<>()));
 
-            boolean fileNamePrinted = false;
+        try (ExecutorService executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("reader-thread-", 0).factory())) {
+            // reader thread
+            executor.submit(() -> {
+                for (final Path logFile : candidateFiles) {
+                    final BlockingQueue<String> queue = queues.get(logFile);
 
-            try (final BufferedReader reader = adapter.adapt(logFile)) {
-                String line;
-                lineLoop:
-                while ((line = reader.readLine()) != null) {
-                    final String lowercaseLine = line.toLowerCase(Locale.ROOT);
+                    try {
+                        String line;
+                        boolean fileNamePrinted = false;
 
-                    // All filters must pass for the line to be valid
-                    for (final Filter filter : this.appliedFilters) {
-                        if (!filter.matches(line, lowercaseLine))
-                            continue lineLoop;
+                        while (!(line = queue.take()).equals(EOF_MARKER)) {
+                            if (!fileNamePrinted) {
+                                fileNamePrinted = true;
+                                lineConsumer.accept("-- File: " + logFile + " --");
+                            }
+
+                            lineConsumer.accept(line);
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
 
-                    if (!fileNamePrinted) {
-                        lineConsumer.accept("-- File: " + logFile + " --");
-                        fileNamePrinted = true;
-                    }
-
-                    lineConsumer.accept(line);
-                    printed.incrementAndGet();
+                    queues.remove(logFile);
                 }
-            } catch (IOException e) {
-                System.out.println("An IO exception occurred while reading file " + logFile);
-                e.printStackTrace();
+            });
+
+            for (final Map.Entry<Path, BlockingQueue<String>> entry : queues.entrySet()) {
+                executor.submit(() -> {
+                    final Path logFile = entry.getKey();
+                    final BlockingQueue<String> queue = entry.getValue();
+
+                    final FileAdapter adapter = FileAdapters.adapterFor(logFile);
+                    if (adapter == null) {
+                        System.out.println("Could not find a compatible adapter for file " + logFile);
+                        queue.offer(EOF_MARKER);
+                        return;
+                    }
+
+                    try (final BufferedReader reader = adapter.adapt(logFile)) {
+                        reader.lines().forEach(line -> {
+                            final String lowercaseLine = line.toLowerCase(Locale.ROOT);
+
+                            // All filters must pass for the line to be valid
+                            for (final Filter filter : this.appliedFilters) {
+                                if (!filter.matches(line, lowercaseLine))
+                                    return;
+                            }
+
+                            printed.incrementAndGet();
+                            try {
+                                queue.put(line);
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                    } catch (IOException e) {
+                        System.out.println("An IO exception occurred while reading file " + logFile);
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            queue.put(EOF_MARKER);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
             }
         }
 
-        if (printed.get() == 0L)
-            System.out.println("Done. No lines matched your filter(s)");
-        else {
-            System.out.printf("Done. Printed %d lines.", printed.get());
+        if (printed.get() == 0L) {
+            System.out.println("Done in " + (System.currentTimeMillis() - start) + " ms. No lines matched your filter(s)");
+        } else {
+            System.out.printf("Done in " + (System.currentTimeMillis() - start) + " ms. Printed %d lines.", printed.get());
             System.out.println();
         }
 
