@@ -274,4 +274,8 @@ public class LogReader {
     public void setMinDate(LocalDate minDate) {
         this.minDate = minDate;
     }
+
+    public LogReaderOptions options() {
+        return this.options;
+    }
 }

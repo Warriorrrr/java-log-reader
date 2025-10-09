@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.regex.Pattern;
 
 public class SaveCommand extends Command {
+    private static final Pattern IPV4_PATTERN = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}");
 
     private final Path outputFolder = Path.of("output");
 
@@ -22,18 +24,21 @@ public class SaveCommand extends Command {
         Path output = outputFolder.resolve(fileName + ".log");
 
         try {
-            if (!Files.exists(outputFolder))
+            if (!Files.exists(outputFolder)) {
                 Files.createDirectories(outputFolder);
-
-            Files.deleteIfExists(output);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         System.out.println("Saving log to './output/" + fileName + ".log'...");
 
-        try (BufferedWriter buf = Files.newBufferedWriter(output, StandardOpenOption.APPEND, StandardOpenOption.CREATE)) {
+        try (BufferedWriter buf = Files.newBufferedWriter(output, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
             reader.read(line -> {
+                if (reader.options().censorIps) {
+                    line = IPV4_PATTERN.matcher(line).replaceAll("*.*.*.*");
+                }
+
                 try {
                     buf.write(line);
                     buf.newLine();
