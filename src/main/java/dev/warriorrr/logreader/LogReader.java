@@ -268,10 +268,18 @@ public class LogReader {
     }
 
     public void setMaxDate(LocalDate maxDate) {
+        if (maxDate != null) {
+            // move the max date one day into the future so that it is included
+            maxDate = maxDate.plusDays(1);
+        }
         this.maxDate = maxDate;
     }
 
     public void setMinDate(LocalDate minDate) {
+        if (minDate != null) {
+            // move the min date one day into the past so that it is included
+            minDate = minDate.minusDays(1);
+        }
         this.minDate = minDate;
     }
 
