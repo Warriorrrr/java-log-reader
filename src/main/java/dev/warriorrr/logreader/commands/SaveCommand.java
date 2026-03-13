@@ -12,14 +12,14 @@ import java.util.regex.Pattern;
 public class SaveCommand extends Command {
     private static final Pattern IPV4_PATTERN = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}");
 
-    private final Path outputFolder = Path.of("output");
-
     public SaveCommand(LogReader reader) {
         super(reader);
     }
 
     @Override
     public void dispatch(String[] args) {
+        final Path outputFolder = reader.options().outputFolder;
+
         String fileName = args.length > 0 ? String.join("-", args) : generateFileName();
         Path output = outputFolder.resolve(fileName + ".log");
 
@@ -59,7 +59,7 @@ public class SaveCommand extends Command {
         for (int i = 1; i < 10000; i++) {
             String fileName = String.format("output-%d", i);
 
-            if (!Files.exists(outputFolder.resolve(fileName + ".log")))
+            if (!Files.exists(reader.options().outputFolder.resolve(fileName + ".log")))
                 return fileName;
         }
 
