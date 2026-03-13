@@ -127,7 +127,7 @@ public class LogReader {
                         while (!(line = queue.take()).equals(EOF_MARKER)) {
                             if (!fileNamePrinted) {
                                 fileNamePrinted = true;
-                                lineConsumer.accept("-- File: " + logFile + " --");
+                                lineConsumer.accept("--- File: " + logFile.getFileName() + " ---");
                             }
 
                             lineConsumer.accept(line);
