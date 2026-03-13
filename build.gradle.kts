@@ -10,9 +10,10 @@ repositories {
 
 dependencies {
     implementation(libs.picocli)
-    implementation(libs.annotations)
+    compileOnly(libs.annotations)
     implementation(libs.jline)
     implementation(libs.jline.jansi)
+    implementation(libs.commons.collections)
 
     testImplementation(libs.junit.api)
     testRuntimeOnly(libs.junit.engine)
@@ -28,6 +29,10 @@ tasks {
 
     shadowJar {
         archiveClassifier.set("all")
+
+        minimize {
+            include(dependency(libs.commons.collections))
+        }
     }
 
     jar {

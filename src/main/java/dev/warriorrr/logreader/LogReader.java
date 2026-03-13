@@ -2,6 +2,7 @@ package dev.warriorrr.logreader;
 
 import dev.warriorrr.logreader.commands.ChangeDirCommand;
 import dev.warriorrr.logreader.commands.Command;
+import dev.warriorrr.logreader.commands.ContextCommand;
 import dev.warriorrr.logreader.commands.DateCommand;
 import dev.warriorrr.logreader.commands.FilterCommand;
 import dev.warriorrr.logreader.commands.HelpCommand;
@@ -11,6 +12,7 @@ import dev.warriorrr.logreader.commands.UndoCommand;
 import dev.warriorrr.logreader.file.FileAdapter;
 import dev.warriorrr.logreader.file.FileAdapters;
 import dev.warriorrr.logreader.filter.Filter;
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedReader;
@@ -26,12 +28,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -48,6 +52,8 @@ public class LogReader {
 
     private LocalDate minDate = null;
     private LocalDate maxDate = null;
+    private int contextLength = -1;
+
     private static final Pattern FILE_NAME_DATE_PATTERN = Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}");
     private static final String EOF_MARKER = "_LOG_READER_END_" + UUID.randomUUID() + "_"; // we need some string to act as a marker for that we reached the end of a queue.
 
@@ -63,6 +69,7 @@ public class LogReader {
         commands.put("changedir", new ChangeDirCommand(this));
         commands.put("cd", commands.get("changedir"));
         commands.put("date", new DateCommand(this));
+        commands.put("context", new ContextCommand(this));
     }
 
     public void receiveCommand(String line) {
@@ -136,41 +143,60 @@ public class LogReader {
             for (final Map.Entry<Path, BlockingQueue<String>> entry : queues.entrySet()) {
                 executor.submit(() -> {
                     final Path logFile = entry.getKey();
-                    final BlockingQueue<String> queue = entry.getValue();
+                    final BlockingQueue<String> output = entry.getValue();
 
                     final FileAdapter adapter = FileAdapters.adapterFor(logFile);
                     if (adapter == null) {
                         System.out.println("Could not find a compatible adapter for file " + logFile);
-                        queue.offer(EOF_MARKER);
+                        output.add(EOF_MARKER);
                         return;
                     }
 
                     try (final BufferedReader reader = adapter.adapt(logFile)) {
+                        final int contextLength = this.contextLength;
+                        final boolean usingContext = contextLength > 0;
+                        final Queue<String> context = usingContext ? new CircularFifoQueue<>(contextLength) : null;
+                        final AtomicInteger remainingAfterContext = new AtomicInteger();
+
                         reader.lines().forEach(line -> {
                             final String lowercaseLine = line.toLowerCase(Locale.ROOT);
 
                             // All filters must pass for the line to be valid
                             for (final Filter filter : this.appliedFilters) {
-                                if (!filter.matches(line, lowercaseLine))
+                                if (!filter.matches(line, lowercaseLine)) {
+
+                                    // handle context
+                                    if (usingContext) {
+                                        if (remainingAfterContext.get() > 0) {
+                                            output.add(line);
+                                            if (remainingAfterContext.decrementAndGet() == 0) {
+                                                output.add("--- Context end");
+                                            }
+                                        } else {
+                                            context.add(line);
+                                        }
+                                    }
+
                                     return;
+                                }
+                            }
+
+                            if (context != null) {
+                                output.add("--- Context start");
+                                output.addAll(context);
+                                context.clear();
                             }
 
                             printed.incrementAndGet();
-                            try {
-                                queue.put(line);
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
+                            output.add(line);
+
+                            remainingAfterContext.set(contextLength);
                         });
                     } catch (IOException e) {
                         System.out.println("An IO exception occurred while reading file " + logFile);
                         e.printStackTrace();
                     } finally {
-                        try {
-                            queue.put(EOF_MARKER);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                        output.add(EOF_MARKER);
                     }
                 });
             }
@@ -273,6 +299,10 @@ public class LogReader {
 
     public void setMinDate(LocalDate minDate) {
         this.minDate = minDate;
+    }
+
+    public void setContextLength(int contextLength) {
+        this.contextLength = contextLength;
     }
 
     public LogReaderOptions options() {

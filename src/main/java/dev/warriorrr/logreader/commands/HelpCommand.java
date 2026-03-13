@@ -21,5 +21,6 @@ public class HelpCommand extends Command {
         System.out.println("- save [filename]                   | Saves all lines matching the filters added using the filter command to an output file.");
         System.out.println("- undo                              | Removes the most recently added filter.");
         System.out.println("- cd <folder>                       | Changes the log folder path");
+        System.out.println("- context <length>                  | Sets the amount of context to print surrounding matches.");
     }
 }
