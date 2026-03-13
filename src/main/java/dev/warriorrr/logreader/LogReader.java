@@ -168,7 +168,12 @@ public class LogReader {
                                     // handle context
                                     if (usingContext) {
                                         if (remainingAfterContext.get() > 0) {
+                                            if (remainingAfterContext.get() == contextLength) {
+                                                output.add("--- Context start");
+                                            }
+
                                             output.add(line);
+
                                             if (remainingAfterContext.decrementAndGet() == 0) {
                                                 output.add("--- Context end");
                                             }
@@ -185,6 +190,7 @@ public class LogReader {
                                 output.add("--- Context start");
                                 output.addAll(context);
                                 context.clear();
+                                output.add("--- Context end");
                             }
 
                             printed.incrementAndGet();
