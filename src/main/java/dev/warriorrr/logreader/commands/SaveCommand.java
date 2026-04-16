@@ -48,7 +48,7 @@ public class SaveCommand extends Command {
                 }
             });
 
-            System.out.println("Log saved as '" + output + "'");
+            System.out.println("Log saved as '" + output + "'.");
         } catch (IOException e) {
             System.out.println("An exception occurred when opening writer for output file");
             e.printStackTrace();
