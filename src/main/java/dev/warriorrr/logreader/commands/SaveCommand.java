@@ -31,7 +31,7 @@ public class SaveCommand extends Command {
             e.printStackTrace();
         }
 
-        System.out.println("Saving log to './output/" + fileName + ".log'...");
+        System.out.println("Saving log to '" + output + "'...");
 
         try (BufferedWriter buf = Files.newBufferedWriter(output, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
             reader.read(line -> {
@@ -48,7 +48,7 @@ public class SaveCommand extends Command {
                 }
             });
 
-            System.out.println("Log saved as './output/" + fileName + ".log'.");
+            System.out.println("Log saved as '" + output + "'.");
         } catch (IOException e) {
             System.out.println("An exception occurred when opening writer for output file");
             e.printStackTrace();
